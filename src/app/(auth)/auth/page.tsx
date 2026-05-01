@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
@@ -84,9 +85,12 @@ export default function AuthPage() {
       {/* Sign up link */}
       <p className="text-center mt-6 text-sm text-text-muted">
         Don&apos;t have an account?{" "}
-        <button className="text-accent hover:text-accent-hover transition-colors cursor-pointer font-medium">
+        <Link
+          href="/auth/signup"
+          className="text-accent hover:text-accent-hover transition-colors font-medium"
+        >
           Sign up
-        </button>
+        </Link>
       </p>
     </div>
   );
