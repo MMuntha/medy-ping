@@ -2,7 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const navItems = [
   {
@@ -51,6 +54,17 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { profile } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   return (
     <>
@@ -97,20 +111,43 @@ export default function Sidebar() {
         </nav>
 
         {/* User section */}
-        <div className="px-4 py-4 border-t border-border">
-          <div className="flex items-center gap-3">
+        <div className="px-4 py-4 border-t border-border mt-auto">
+          <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-              <span className="text-xs font-medium text-accent">JD</span>
+              <span className="text-xs font-medium text-accent">
+                {profile?.email?.[0].toUpperCase() || "U"}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text-primary truncate">
-                John Doe
+                {profile?.email?.split("@")[0] || "User"}
               </p>
               <p className="text-xs text-text-muted truncate">
-                john@example.com
+                {profile?.email || "No email"}
               </p>
             </div>
           </div>
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-danger hover:bg-danger/10 transition-all duration-150 group"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="group-hover:translate-x-0.5 transition-transform"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign Out
+          </button>
         </div>
       </aside>
 
@@ -141,6 +178,28 @@ export default function Sidebar() {
               </li>
             );
           })}
+          <li>
+            <button
+              onClick={handleSignOut}
+              className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg text-xs text-text-muted hover:text-danger transition-all duration-150"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Logout</span>
+            </button>
+          </li>
         </ul>
       </nav>
     </>

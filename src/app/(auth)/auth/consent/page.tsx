@@ -6,15 +6,27 @@ import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
 import Checkbox from "@/components/atoms/Checkbox";
 import StepIndicator from "@/components/molecules/StepIndicator";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function ConsentPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleContinue = async () => {
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 500));
+    if (user) {
+      try {
+        await updateDoc(doc(db, "users", user.uid), {
+          consentGiven: true,
+        });
+      } catch (error) {
+        console.error("Error updating consent:", error);
+      }
+    }
     setLoading(false);
     router.push("/dashboard");
   };

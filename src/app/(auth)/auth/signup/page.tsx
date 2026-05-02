@@ -7,6 +7,10 @@ import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
 import StepIndicator from "@/components/molecules/StepIndicator";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { sendWhatsAppOTP } from "@/app/actions/auth";
 
 function validateSLPhone(phone: string): boolean {
   const digits = phone.replace(/\s/g, "");
@@ -54,9 +58,37 @@ export default function SignupPage() {
     }
 
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 800));
-    setLoading(false);
-    router.push("/auth/verify");
+    try {
+      const fullPhone = `+94${phone}`;
+      
+      // 1. Create User
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Save profile in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: email,
+        phoneNumber: fullPhone,
+        whatsappVerified: false,
+        createdAt: serverTimestamp(),
+      });
+
+      // 3. Send WhatsApp OTP
+      const res = await sendWhatsAppOTP(fullPhone);
+      if (!res.success) {
+        setPhoneError(res.error || "Failed to send OTP");
+        setLoading(false);
+        return;
+      }
+
+      // 4. Redirect to verify page with phone number
+      router.push(`/auth/verify?phone=${encodeURIComponent(fullPhone)}`);
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      setPasswordError(error.message || "Failed to sign up");
+      setLoading(false);
+    }
   };
 
   return (

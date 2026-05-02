@@ -6,20 +6,46 @@ import Link from "next/link";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { UserProfile } from "@/components/providers/AuthProvider";
 
 export default function AuthPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate auth delay
-    await new Promise((res) => setTimeout(res, 800));
-    setLoading(false);
-    router.push("/dashboard");
+    setError("");
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const docSnap = await getDoc(doc(db, "users", user.uid));
+      if (docSnap.exists()) {
+        const profile = docSnap.data() as UserProfile;
+        if (!profile.whatsappVerified) {
+          router.push(`/auth/verify?phone=${encodeURIComponent(profile.phoneNumber)}`);
+        } else if (!profile.consentGiven) {
+          router.push("/auth/consent");
+        } else {
+          router.push("/dashboard");
+        }
+      } else {
+        // Fallback if no profile exists
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setError("Invalid email or password");
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,6 +95,12 @@ export default function AuthPage() {
               </button>
             </div>
           </div>
+
+          {error && (
+            <div className="text-sm text-danger animate-fade-in">
+              {error}
+            </div>
+          )}
 
           <Button
             type="submit"

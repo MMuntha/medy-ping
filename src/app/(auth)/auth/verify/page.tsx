@@ -1,15 +1,24 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
 import StepIndicator from "@/components/molecules/StepIndicator";
+import { verifyWhatsAppOTP, sendWhatsAppOTP } from "@/app/actions/auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/components/providers/AuthProvider";
 
-export default function VerifyPage() {
+function VerifyContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const phone = searchParams.get("phone");
+
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [resendTimer, setResendTimer] = useState(30);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -33,6 +42,8 @@ export default function VerifyPage() {
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
+    
+    if (error) setError("");
   };
 
   const handleKeyDown = (
@@ -50,23 +61,60 @@ export default function VerifyPage() {
     if (pasted.length === 6) {
       setOtp(pasted.split(""));
       inputRefs.current[5]?.focus();
+      if (error) setError("");
     }
-  }, []);
+  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.some((d) => !d)) return;
+    if (!phone) {
+      setError("Phone number missing. Please go back and sign up again.");
+      return;
+    }
+    if (!user) {
+      setError("Session missing. Please sign in again.");
+      return;
+    }
 
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 800));
-    setLoading(false);
-    router.push("/auth/consent");
+    setError("");
+    
+    try {
+      const code = otp.join("");
+      const res = await verifyWhatsAppOTP(phone, code);
+      
+      if (res.success) {
+        // Update Firestore
+        await updateDoc(doc(db, "users", user.uid), {
+          whatsappVerified: true,
+        });
+        router.push("/auth/consent");
+      } else {
+        setError(res.error || "Invalid verification code");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      setError(err.message || "Failed to verify code");
+      setLoading(false);
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
+    if (!phone) return;
     setResendTimer(30);
     setOtp(Array(6).fill(""));
+    setError("");
     inputRefs.current[0]?.focus();
+    
+    // Call server action to resend
+    try {
+      await sendWhatsAppOTP(phone);
+    } catch (err) {
+      console.error("Resend error:", err);
+      setError("Failed to resend code");
+    }
   };
 
   const isComplete = otp.every((d) => d !== "");
@@ -92,6 +140,7 @@ export default function VerifyPage() {
         </Text>
         <Text variant="body" className="text-center mt-2">
           We sent a 6-digit code to your WhatsApp
+          {phone && <span className="block mt-1 font-medium">{phone}</span>}
         </Text>
       </div>
 
@@ -118,12 +167,19 @@ export default function VerifyPage() {
                   text-text-primary
                   transition-all duration-150
                   focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
-                  ${digit ? "border-accent/50" : "border-border"}
+                  ${error ? "border-danger focus:border-danger focus:ring-danger" : ""}
+                  ${digit && !error ? "border-accent/50" : !error ? "border-border" : ""}
                 `}
                 aria-label={`Digit ${index + 1}`}
               />
             ))}
           </div>
+
+          {error && (
+            <div className="mb-4 text-center text-sm text-danger animate-fade-in">
+              {error}
+            </div>
+          )}
 
           <Button
             type="submit"
@@ -148,6 +204,7 @@ export default function VerifyPage() {
         ) : (
           <button
             onClick={handleResend}
+            type="button"
             className="text-accent hover:text-accent-hover transition-colors font-medium cursor-pointer"
           >
             Resend
@@ -155,5 +212,17 @@ export default function VerifyPage() {
         )}
       </p>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
+      </div>
+    }>
+      <VerifyContent />
+    </Suspense>
   );
 }
