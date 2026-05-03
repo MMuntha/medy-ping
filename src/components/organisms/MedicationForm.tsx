@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Medication } from "@/lib/types";
+import { useMedications } from "@/hooks/useMedications";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import TimeInput from "@/components/atoms/TimeInput";
@@ -20,8 +21,20 @@ const frequencyOptions = [
   "As Needed",
 ];
 
+const colorPalette = [
+  "#EF4444", // Red
+  "#3B82F6", // Blue
+  "#10B981", // Green
+  "#F59E0B", // Amber
+  "#8B5CF6", // Purple
+  "#EC4899", // Pink
+  "#06B6D4", // Cyan
+  "#F97316", // Orange
+];
+
 export default function MedicationForm({ initialData }: MedicationFormProps) {
   const router = useRouter();
+  const { addMedication, updateMedication } = useMedications();
   const isEditing = !!initialData;
 
   const [name, setName] = useState(initialData?.name ?? "");
@@ -35,6 +48,8 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
   const [notes, setNotes] = useState(initialData?.notes ?? "");
   const [startDate, setStartDate] = useState(initialData?.startDate ?? "");
   const [endDate, setEndDate] = useState(initialData?.endDate ?? "");
+  const [color, setColor] = useState(initialData?.color ?? "");
+  const [isSaving, setIsSaving] = useState(false);
 
   const addTime = () => {
     setTimes([...times, "12:00"]);
@@ -52,10 +67,38 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
     setTimes(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const getRandomColor = () => {
+    return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // UI only — no actual submission
-    router.push("/medications");
+    setIsSaving(true);
+    
+    try {
+      const finalColor = color || getRandomColor();
+      const medicationData = {
+        name,
+        dosage,
+        frequency,
+        times,
+        notes,
+        startDate,
+        endDate,
+        color: finalColor,
+      };
+
+      if (isEditing && initialData) {
+        await updateMedication(initialData.id, medicationData);
+      } else {
+        await addMedication(medicationData);
+      }
+      router.push("/medications");
+    } catch (error) {
+      console.error("Error saving medication:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -133,6 +176,30 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
+        </div>
+
+        {/* Color Picker */}
+        <div className="mt-6 flex flex-col gap-2">
+          <label className="text-sm font-medium text-text-secondary">
+            Color Indicator (Optional)
+          </label>
+          <div className="flex flex-wrap gap-3">
+            {colorPalette.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={`w-8 h-8 rounded-full transition-all duration-200 border-2 ${
+                  color === c 
+                    ? "border-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.3)]" 
+                    : "border-transparent hover:scale-110"
+                }`}
+                style={{ backgroundColor: c }}
+                aria-label={`Select color ${c}`}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-text-muted mt-1">If no color is chosen, a random one will be assigned.</p>
         </div>
 
         {/* Notes */}
@@ -240,10 +307,11 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           type="button"
           variant="secondary"
           onClick={() => router.back()}
+          disabled={isSaving}
         >
           Cancel
         </Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" loading={isSaving}>
           {isEditing ? "Save Changes" : "Add Medication"}
         </Button>
       </div>

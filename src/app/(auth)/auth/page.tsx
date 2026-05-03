@@ -24,14 +24,20 @@ export default function AuthPage() {
     setError("");
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
       const docSnap = await getDoc(doc(db, "users", user.uid));
       if (docSnap.exists()) {
         const profile = docSnap.data() as UserProfile;
         if (!profile.whatsappVerified) {
-          router.push(`/auth/verify?phone=${encodeURIComponent(profile.phoneNumber)}`);
+          router.push(
+            `/auth/verify?phone=${encodeURIComponent(profile.phoneNumber)}`
+          );
         } else if (!profile.consentGiven) {
           router.push("/auth/consent");
         } else {
@@ -65,7 +71,11 @@ export default function AuthPage() {
 
       {/* Login card */}
       <div className="bg-card border border-border rounded-xl p-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-5"
+          autoComplete="off"
+        >
           <Input
             label="Email"
             id="auth-email"
@@ -97,9 +107,7 @@ export default function AuthPage() {
           </div>
 
           {error && (
-            <div className="text-sm text-danger animate-fade-in">
-              {error}
-            </div>
+            <div className="text-sm text-danger animate-fade-in">{error}</div>
           )}
 
           <Button

@@ -57,11 +57,7 @@ export default function Button({
       {...props}
     >
       {loading ? (
-        <svg
-          className="animate-spin h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
+        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
           <circle
             className="opacity-25"
             cx="12"
