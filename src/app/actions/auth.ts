@@ -15,15 +15,19 @@ const getTwilioClient = () => {
 
 export async function sendWhatsAppOTP(phoneNumber: string) {
   try {
+    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV MODE] Simulated OTP sent to ${formattedPhone}`);
+      return { success: true, status: "pending" };
+    }
+
     if (!verifyServiceSid) {
       throw new Error("Missing TWILIO_VERIFY_SERVICE_SID in environment variables");
     }
 
     const client = getTwilioClient();
     
-    // Ensure the phone number starts with a '+'
-    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
-
     const verification = await client.verify.v2
       .services(verifyServiceSid)
       .verifications.create({
@@ -40,15 +44,22 @@ export async function sendWhatsAppOTP(phoneNumber: string) {
 
 export async function verifyWhatsAppOTP(phoneNumber: string, code: string) {
   try {
+    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+
+    if (process.env.NODE_ENV === "development") {
+      if (code === "123456") {
+        console.log(`[DEV MODE] OTP verified successfully for ${formattedPhone}`);
+        return { success: true };
+      }
+      return { success: false, error: "Invalid test code. Use 123456 in dev mode." };
+    }
+
     if (!verifyServiceSid) {
       throw new Error("Missing TWILIO_VERIFY_SERVICE_SID in environment variables");
     }
 
     const client = getTwilioClient();
     
-    // Ensure the phone number starts with a '+'
-    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
-
     const verificationCheck = await client.verify.v2
       .services(verifyServiceSid)
       .verificationChecks.create({

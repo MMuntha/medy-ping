@@ -1,6 +1,5 @@
 import React from "react";
 import { Reminder } from "@/lib/types";
-import { getRemindersByTime } from "@/lib/mock-data";
 import ReminderRow from "@/components/molecules/ReminderRow";
 import Text from "@/components/atoms/Text";
 
@@ -9,7 +8,20 @@ interface TodayScheduleProps {
 }
 
 export default function TodaySchedule({ reminders }: TodayScheduleProps) {
-  const grouped = getRemindersByTime();
+  const grouped = {
+    morning: reminders.filter((r) => {
+      const hour = parseInt(r.time.split(":")[0]);
+      return hour < 12;
+    }),
+    afternoon: reminders.filter((r) => {
+      const hour = parseInt(r.time.split(":")[0]);
+      return hour >= 12 && hour < 17;
+    }),
+    evening: reminders.filter((r) => {
+      const hour = parseInt(r.time.split(":")[0]);
+      return hour >= 17;
+    }),
+  };
 
   const sections = [
     {

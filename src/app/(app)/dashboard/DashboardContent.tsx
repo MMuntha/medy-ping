@@ -8,10 +8,12 @@ import TodaySchedule from "@/components/organisms/TodaySchedule";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
 import { useMedications } from "@/hooks/useMedications";
+import { useTodayLogs } from "@/hooks/useTodayLogs";
 import { Reminder } from "@/lib/types";
 
 export default function DashboardContent() {
   const { medications, loading, error } = useMedications();
+  const { logs, loading: logsLoading } = useTodayLogs();
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -23,27 +25,32 @@ export default function DashboardContent() {
   // Generate today's schedule based on the user's medications
   const reminders: Reminder[] = medications
     .flatMap((med) =>
-      med.times.map((time) => ({
-        id: `${med.id}-${time}`,
-        medicationId: med.id,
-        medicationName: med.name,
-        dosage: med.dosage,
-        time: time,
-        status: "pending" as const, // For now, everything is pending
-        color: med.color || "#5B6CFF",
-      }))
+      med.times.map((time) => {
+        const log = logs.find(
+          (l) => l.medicationId === med.id && l.scheduledTime === time
+        );
+        return {
+          id: `${med.id}-${time}`,
+          medicationId: med.id,
+          medicationName: med.name,
+          dosage: med.dosage,
+          time: time,
+          status: (log?.status === "taken" ? "taken" : "pending") as "taken" | "pending" | "missed",
+          color: med.color || "#5B6CFF",
+        };
+      })
     )
     .sort((a, b) => a.time.localeCompare(b.time));
 
   const stats = {
     total: medications.length,
     todayReminders: reminders.length,
-    taken: 0,
-    pending: reminders.length,
+    taken: reminders.filter((r) => r.status === "taken").length,
+    pending: reminders.filter((r) => r.status === "pending").length,
     missed: 0,
   };
 
-  if (loading) {
+  if (loading || logsLoading) {
     return (
       <div className="flex justify-center items-center py-20">
         <div className="w-8 h-8 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />

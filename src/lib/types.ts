@@ -19,3 +19,29 @@ export interface Reminder {
   status: "taken" | "pending" | "missed";
   color: string;
 }
+
+export interface DueMedication {
+  id: string;
+  name: string;
+  dosage: string;
+  scheduledTime: string;
+}
+
+export interface MedicationLog {
+  id?: string;
+  userId: string;
+  medicationId: string;
+  medicationName: string;
+  scheduledTime: string | null;
+  status: "taken" | "pending" | "missed";
+  timestamp: any; // Firestore Timestamp
+  dateString: string;
+}
+
+export interface TwilioMessagePayload {
+  from: string;
+  to: string;
+  body?: string;
+  contentSid?: string;
+  contentVariables?: string;
+}

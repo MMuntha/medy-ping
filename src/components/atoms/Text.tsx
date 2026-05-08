@@ -7,6 +7,7 @@ interface TextProps {
   children: React.ReactNode;
   className?: string;
   muted?: boolean;
+  style?: React.CSSProperties;
 }
 
 const variantConfig: Record<
@@ -43,6 +44,7 @@ export default function Text({
   children,
   className = "",
   muted = false,
+  style,
 }: TextProps) {
   const config = variantConfig[variant];
   const Tag = config.tag;
@@ -54,6 +56,7 @@ export default function Text({
         ${muted ? "!text-text-muted" : ""}
         ${className}
       `}
+      style={style}
     >
       {children}
     </Tag>
