@@ -63,7 +63,7 @@ export default function LandingHero() {
           style={{ perspective: 1200 }}
         >
           {/* Glow */}
-          <div className="absolute inset-x-8 inset-y-8 bg-accent/8 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute inset-x-8 inset-y-8 bg-accent/12 rounded-full blur-[80px] pointer-events-none " />
 
           {/* Desktop Mockup */}
           <motion.div
@@ -76,11 +76,11 @@ export default function LandingHero() {
             className="hidden md:block"
           >
             <Image
-              src="/images/hero-desktop-v12.png"
+              src="/images/hero-desktop-v14.png"
               alt="MedyPing Dashboard on Desktop"
               width={1200}
               height={800}
-              className="relative w-full h-auto object-contain drop-shadow-2xl"
+              className="relative w-full h-auto object-contain drop-shadow-2xl rounded-2xl"
               priority
             />
           </motion.div>
@@ -88,7 +88,7 @@ export default function LandingHero() {
           {/* Mobile Mockup - No animation */}
           <div className="md:hidden">
             <Image
-              src="/images/hero-mobile-v2.png"
+              src="/images/hero-mobile-v3.png"
               alt="MedyPing Dashboard on Mobile"
               width={600}
               height={1200}
@@ -101,7 +101,7 @@ export default function LandingHero() {
       </div>
 
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent/8 rounded-full blur-[100px] -z-10 pointer-events-none" />
     </section>
   );
 }

@@ -44,7 +44,7 @@ export default function LandingProblemSolution() {
             <div className="relative w-full max-w-[320px]">
               <div className="absolute inset-8  rounded-full blur-[60px] pointer-events-none" />
               <Image
-                src="/images/mobile-whatsapp-v3.png"
+                src="/images/mobile-whatsapp-v4.png"
                 alt="WhatsApp Reminder"
                 width={600}
                 height={1200}
@@ -55,7 +55,8 @@ export default function LandingProblemSolution() {
 
           {/* Solution Text */}
           <div className="order-1 md:order-2">
-            <div className="w-16 h-16 bg-accent/10 text-accent flex items-center justify-center rounded-2xl mb-8">
+            <div className="w-16 h-16 bg-accent/10 text-accent flex items-center justify-center rounded-2xl mb-8 mx-auto md:mx-0">
+              {" "}
               <svg
                 width="32"
                 height="32"

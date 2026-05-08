@@ -34,7 +34,7 @@ export default function LandingCTA() {
           </div>
 
           {/* CTA Box */}
-          <div className="bg-accent text-white p-10 lg:p-14 rounded-3xl text-center shadow-xl shadow-accent/20">
+          <div className="bg-accent text-white p-10 lg:p-14 rounded-3xl text-center shadow-xl shadow-accent/15">
             <Text variant="h2" className="text-3xl lg:text-4xl font-bold mb-4 text-white">
               We're just getting started
             </Text>

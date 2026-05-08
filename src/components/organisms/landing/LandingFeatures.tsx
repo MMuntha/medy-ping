@@ -196,7 +196,7 @@ export default function LandingFeatures() {
                 <div className="absolute inset-8 bg-accent/10 rounded-full blur-[60px] pointer-events-none" />
 
                 <Image
-                  src="/images/mobile-webapp-v4.png"
+                  src="/images/mobile-webapp-v5.png"
                   alt="MedyPing Mobile App"
                   width={1200}
                   height={500}
