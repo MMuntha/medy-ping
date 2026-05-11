@@ -1,6 +1,7 @@
 "use server";
 
 import twilio from "twilio";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -77,3 +78,96 @@ export async function verifyWhatsAppOTP(phoneNumber: string, code: string) {
     return { success: false, error: error.message || "Failed to verify OTP" };
   }
 }
+
+export async function finalizeSignupAction(email: string, password: string | undefined, phoneNumber: string, code: string) {
+  try {
+    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+
+    // 1. Verify OTP first (using the existing function)
+    const verification = await verifyWhatsAppOTP(formattedPhone, code);
+    if (!verification.success) {
+      return { success: false, error: verification.error };
+    }
+
+    // 2. Create User atomically via Admin SDK
+    let userRecord;
+    try {
+      // If password is provided, it's an email/password signup.
+      // If password is not provided, it's a Google signin that just needed phone verification.
+      // We will handle passwordless/Google flows later. For now, require password.
+      if (!password) throw new Error("Password is required for email signup.");
+      
+      userRecord = await adminAuth.createUser({
+        email,
+        password,
+        phoneNumber: formattedPhone, // This also validates the phone uniqueness in Firebase Auth!
+        emailVerified: false,
+      });
+    } catch (authError: any) {
+      console.error("Admin Auth Error:", authError);
+      return { success: false, error: authError.message || "Failed to create user account" };
+    }
+
+    // 3. Create Firestore Profile
+    try {
+      await adminDb.collection("users").doc(userRecord.uid).set({
+        uid: userRecord.uid,
+        email,
+        phoneNumber: formattedPhone,
+        whatsappVerified: true,
+        consentGiven: true, // Now collected mandatory during step 1 of signup
+        createdAt: new Date(),
+      });
+    } catch (dbError: any) {
+      // Rollback Auth User if DB creation fails
+      console.error("Firestore Error, rolling back user:", dbError);
+      await adminAuth.deleteUser(userRecord.uid).catch(console.error);
+      return { success: false, error: "Failed to initialize user profile" };
+    }
+
+    return { success: true, uid: userRecord.uid };
+  } catch (error: any) {
+    console.error("Finalize Signup Error:", error);
+    return { success: false, error: error.message || "An unexpected error occurred" };
+  }
+}
+
+export async function resetPasswordAction(phoneNumber: string, code: string, newPassword: string) {
+  try {
+    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+
+    // 1. Verify OTP
+    const verification = await verifyWhatsAppOTP(formattedPhone, code);
+    if (!verification.success) {
+      return { success: false, error: verification.error };
+    }
+
+    // 2. Find User by Phone Number
+    // Firebase Admin Auth allows fetching user by phone number
+    let userRecord;
+    try {
+      userRecord = await adminAuth.getUserByPhoneNumber(formattedPhone);
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        return { success: false, error: "No account found with this phone number." };
+      }
+      throw error;
+    }
+
+    // 3. Update Password
+    try {
+      await adminAuth.updateUser(userRecord.uid, {
+        password: newPassword,
+      });
+    } catch (updateError: any) {
+      console.error("Password Update Error:", updateError);
+      return { success: false, error: updateError.message || "Failed to update password." };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Reset Password Error:", error);
+    return { success: false, error: error.message || "An unexpected error occurred." };
+  }
+}
+

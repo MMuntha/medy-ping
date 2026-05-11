@@ -2,16 +2,15 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { z } from "zod";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Medication } from "@/lib/types";
 import { useMedications } from "@/hooks/useMedications";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import TimeInput from "@/components/atoms/TimeInput";
 import Text from "@/components/atoms/Text";
-
-interface MedicationFormProps {
-  initialData?: Medication;
-}
 
 const frequencyOptions = [
   "Daily",
@@ -32,66 +31,85 @@ const colorPalette = [
   "#F97316", // Orange
 ];
 
+const medicationSchema = z.object({
+  name: z.string().min(1, "Medication name is required"),
+  dosage: z.string().min(1, "Dosage is required"),
+  frequency: z.string().min(1, "Frequency is required"),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  color: z.string().optional(),
+  notes: z.string().optional(),
+  times: z.array(z.object({
+    value: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time"),
+  })).min(1, "At least one reminder time is required"),
+});
+
+type MedicationData = z.infer<typeof medicationSchema>;
+
+interface MedicationFormProps {
+  initialData?: Medication;
+}
+
 export default function MedicationForm({ initialData }: MedicationFormProps) {
   const router = useRouter();
   const { addMedication, updateMedication } = useMedications();
   const isEditing = !!initialData;
-
-  const [name, setName] = useState(initialData?.name ?? "");
-  const [dosage, setDosage] = useState(initialData?.dosage ?? "");
-  const [frequency, setFrequency] = useState(
-    initialData?.frequency ?? "Daily"
-  );
-  const [times, setTimes] = useState<string[]>(
-    initialData?.times ?? ["08:00"]
-  );
-  const [notes, setNotes] = useState(initialData?.notes ?? "");
-  const [startDate, setStartDate] = useState(initialData?.startDate ?? "");
-  const [endDate, setEndDate] = useState(initialData?.endDate ?? "");
-  const [color, setColor] = useState(initialData?.color ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
-  const addTime = () => {
-    setTimes([...times, "12:00"]);
-  };
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<MedicationData>({
+    resolver: zodResolver(medicationSchema),
+    defaultValues: {
+      name: initialData?.name || "",
+      dosage: initialData?.dosage || "",
+      frequency: initialData?.frequency || "Daily",
+      startDate: initialData?.startDate || "",
+      endDate: initialData?.endDate || "",
+      color: initialData?.color || "",
+      notes: initialData?.notes || "",
+      times: initialData?.times ? initialData.times.map((t) => ({ value: t })) : [{ value: "08:00" }],
+    },
+  });
 
-  const removeTime = (index: number) => {
-    if (times.length > 1) {
-      setTimes(times.filter((_, i) => i !== index));
-    }
-  };
+  const { fields, append, remove } = useFieldArray({
+    name: "times",
+    control,
+  });
 
-  const updateTime = (index: number, value: string) => {
-    const updated = [...times];
-    updated[index] = value;
-    setTimes(updated);
-  };
+  const selectedColor = watch("color");
 
   const getRandomColor = () => {
     return colorPalette[Math.floor(Math.random() * colorPalette.length)];
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: MedicationData) => {
     setIsSaving(true);
     
     try {
-      const finalColor = color || getRandomColor();
-      const medicationData = {
-        name,
-        dosage,
-        frequency,
-        times,
-        notes,
-        startDate,
-        endDate,
+      const finalColor = data.color || getRandomColor();
+      const stringTimes = data.times.map((t) => t.value);
+      
+      const medicationPayload = {
+        name: data.name,
+        dosage: data.dosage,
+        frequency: data.frequency,
+        times: stringTimes,
+        notes: data.notes || "",
+        startDate: data.startDate || "",
+        endDate: data.endDate || "",
         color: finalColor,
       };
 
       if (isEditing && initialData) {
-        await updateMedication(initialData.id, medicationData);
+        await updateMedication(initialData.id, medicationPayload);
       } else {
-        await addMedication(medicationData);
+        await addMedication(medicationPayload);
       }
       router.push("/medications");
     } catch (error) {
@@ -102,7 +120,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="animate-fade-in">
+    <form onSubmit={handleSubmit(onSubmit)} className="animate-fade-in">
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Name */}
@@ -110,9 +128,8 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             label="Medication Name"
             id="medication-name"
             placeholder="e.g. Lisinopril"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
+            {...register("name")}
+            error={errors.name?.message}
           />
 
           {/* Dosage */}
@@ -120,9 +137,8 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             label="Dosage"
             id="medication-dosage"
             placeholder="e.g. 10mg"
-            value={dosage}
-            onChange={(e) => setDosage(e.target.value)}
-            required
+            {...register("dosage")}
+            error={errors.dosage?.message}
           />
 
           {/* Frequency */}
@@ -135,8 +151,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             </label>
             <select
               id="medication-frequency"
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
+              {...register("frequency")}
               className="
                 w-full px-3 py-2.5 rounded-lg
                 bg-bg border border-border
@@ -157,6 +172,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
                 </option>
               ))}
             </select>
+            {errors.frequency && <span className="text-xs text-danger">{errors.frequency.message}</span>}
           </div>
 
           {/* Start Date */}
@@ -164,8 +180,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             label="Start Date (optional)"
             id="medication-start-date"
             type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            {...register("startDate")}
           />
 
           {/* End Date */}
@@ -173,8 +188,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             label="End Date (optional)"
             id="medication-end-date"
             type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            {...register("endDate")}
           />
         </div>
 
@@ -188,9 +202,9 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
               <button
                 key={c}
                 type="button"
-                onClick={() => setColor(c)}
+                onClick={() => setValue("color", c)}
                 className={`w-8 h-8 rounded-full transition-all duration-200 border-2 ${
-                  color === c 
+                  selectedColor === c 
                     ? "border-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.3)]" 
                     : "border-transparent hover:scale-110"
                 }`}
@@ -213,8 +227,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           <textarea
             id="medication-notes"
             placeholder="Any special instructions or notes..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            {...register("notes")}
             rows={3}
             className="
               w-full px-3 py-2.5 rounded-lg
@@ -236,7 +249,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={addTime}
+              onClick={() => append({ value: "12:00" })}
               icon={
                 <svg
                   width="14"
@@ -258,20 +271,31 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           </div>
 
           <div className="flex flex-col gap-3">
-            {times.map((time, index) => (
-              <div key={index} className="flex items-end gap-3">
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex items-end gap-3">
                 <div className="flex-1">
-                  <TimeInput
-                    value={time}
-                    onChange={(val) => updateTime(index, val)}
-                    id={`reminder-time-${index}`}
-                    label={`Time ${index + 1}`}
+                  <Controller
+                    control={control}
+                    name={`times.${index}.value`}
+                    render={({ field: { onChange, value } }) => (
+                      <TimeInput
+                        value={value}
+                        onChange={onChange}
+                        id={`reminder-time-${index}`}
+                        label={`Time ${index + 1}`}
+                      />
+                    )}
                   />
+                  {errors.times?.[index]?.value && (
+                    <span className="text-xs text-danger block mt-1">
+                      {errors.times[index]?.value?.message}
+                    </span>
+                  )}
                 </div>
-                {times.length > 1 && (
+                {fields.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeTime(index)}
+                    onClick={() => remove(index)}
                     className="
                       h-[42px] w-[42px] flex items-center justify-center
                       rounded-lg border border-border
@@ -297,6 +321,9 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
                 )}
               </div>
             ))}
+            {errors.times?.root && (
+              <span className="text-xs text-danger">{errors.times.root.message}</span>
+            )}
           </div>
         </div>
       </div>
