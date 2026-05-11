@@ -83,24 +83,19 @@ export async function finalizeSignupAction(email: string, password: string | und
   try {
     const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
 
-    // 1. Verify OTP first (using the existing function)
     const verification = await verifyWhatsAppOTP(formattedPhone, code);
     if (!verification.success) {
       return { success: false, error: verification.error };
     }
 
-    // 2. Create User atomically via Admin SDK
     let userRecord;
     try {
-      // If password is provided, it's an email/password signup.
-      // If password is not provided, it's a Google signin that just needed phone verification.
-      // We will handle passwordless/Google flows later. For now, require password.
       if (!password) throw new Error("Password is required for email signup.");
       
       userRecord = await adminAuth.createUser({
         email,
         password,
-        phoneNumber: formattedPhone, // This also validates the phone uniqueness in Firebase Auth!
+        phoneNumber: formattedPhone,
         emailVerified: false,
       });
     } catch (authError: any) {
@@ -108,18 +103,16 @@ export async function finalizeSignupAction(email: string, password: string | und
       return { success: false, error: authError.message || "Failed to create user account" };
     }
 
-    // 3. Create Firestore Profile
     try {
       await adminDb.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,
         email,
         phoneNumber: formattedPhone,
         whatsappVerified: true,
-        consentGiven: true, // Now collected mandatory during step 1 of signup
+        consentGiven: true,
         createdAt: new Date(),
       });
     } catch (dbError: any) {
-      // Rollback Auth User if DB creation fails
       console.error("Firestore Error, rolling back user:", dbError);
       await adminAuth.deleteUser(userRecord.uid).catch(console.error);
       return { success: false, error: "Failed to initialize user profile" };
@@ -136,14 +129,11 @@ export async function resetPasswordAction(phoneNumber: string, code: string, new
   try {
     const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
 
-    // 1. Verify OTP
     const verification = await verifyWhatsAppOTP(formattedPhone, code);
     if (!verification.success) {
       return { success: false, error: verification.error };
     }
 
-    // 2. Find User by Phone Number
-    // Firebase Admin Auth allows fetching user by phone number
     let userRecord;
     try {
       userRecord = await adminAuth.getUserByPhoneNumber(formattedPhone);
@@ -154,7 +144,6 @@ export async function resetPasswordAction(phoneNumber: string, code: string, new
       throw error;
     }
 
-    // 3. Update Password
     try {
       await adminAuth.updateUser(userRecord.uid, {
         password: newPassword,

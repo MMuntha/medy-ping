@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/atoms/Input";
@@ -15,40 +14,12 @@ import StepIndicator from "@/components/molecules/StepIndicator";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { sendWhatsAppOTP, finalizeSignupAction } from "@/app/actions/auth";
-
-// --- SCHEMAS ---
-const step1Schema = z
-  .object({
-    email: z.string().email("Invalid email address"),
-    phone: z
-      .string()
-      .transform((val) => val.replace(/[^\d]/g, "")) // strip spaces/formatting
-      .refine((val) => /^7\d{8}$/.test(val), {
-        message: "Enter a valid Sri Lankan mobile number (e.g. 7X XXX XXXX)",
-      }),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-    consentGiven: z.boolean().refine((val) => val === true, {
-      message: "You must agree to receive reminders on WhatsApp",
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-type Step1Data = z.infer<typeof step1Schema>;
-
-const step2Schema = z.object({
-  otpCode: z
-    .string()
-    .transform((val) => val.replace(/[^\d]/g, ""))
-    .refine((val) => val.length === 6, {
-      message: "Code must be exactly 6 digits",
-    }),
-});
-
-type Step2Data = z.infer<typeof step2Schema>;
+import {
+  signupStep1Schema,
+  signupStep2Schema,
+  SignupStep1Data,
+  SignupStep2Data,
+} from "@/lib/schemas/auth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -56,19 +27,17 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [globalError, setGlobalError] = useState("");
 
-  // Store step 1 data to pass to step 2
-  const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
+  const [step1Data, setStep1Data] = useState<SignupStep1Data | null>(null);
 
-  // Forms
   const {
     register: registerStep1,
     handleSubmit: handleSubmitStep1,
     control: controlStep1,
     formState: { errors: errors1 },
-  } = useForm<Step1Data>({
-    resolver: zodResolver(step1Schema),
+  } = useForm<SignupStep1Data>({
+    resolver: zodResolver(signupStep1Schema),
     defaultValues: {
-      consentGiven: true, // Default to true as it's mandatory
+      consentGiven: true,
     },
   });
 
@@ -77,11 +46,11 @@ export default function SignupPage() {
     handleSubmit: handleSubmitStep2,
     control: controlStep2,
     formState: { errors: errors2 },
-  } = useForm<Step2Data>({
-    resolver: zodResolver(step2Schema),
+  } = useForm<SignupStep2Data>({
+    resolver: zodResolver(signupStep2Schema),
   });
 
-  const onStep1Submit = async (data: Step1Data) => {
+  const onStep1Submit = async (data: SignupStep1Data) => {
     setLoading(true);
     setGlobalError("");
     try {
@@ -104,7 +73,7 @@ export default function SignupPage() {
     }
   };
 
-  const onStep2Submit = async (data: Step2Data) => {
+  const onStep2Submit = async (data: SignupStep2Data) => {
     if (!step1Data) return;
     setLoading(true);
     setGlobalError("");
@@ -124,7 +93,6 @@ export default function SignupPage() {
         return;
       }
 
-      // Automatically sign in the user now that the server created the account
       await signInWithEmailAndPassword(
         auth,
         step1Data.email,
@@ -178,7 +146,6 @@ export default function SignupPage() {
               error={errors1.email?.message}
             />
 
-            {/* Phone Input */}
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="signup-phone"
@@ -229,7 +196,6 @@ export default function SignupPage() {
               error={errors1.confirmPassword?.message}
             />
 
-            {/* Mandatory Consent Checkbox via RHF Controller */}
             <div className="pt-2">
               <Controller
                 name="consentGiven"

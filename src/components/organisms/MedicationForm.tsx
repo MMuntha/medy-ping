@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { z } from "zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Medication } from "@/lib/types";
@@ -11,6 +10,7 @@ import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import TimeInput from "@/components/atoms/TimeInput";
 import Text from "@/components/atoms/Text";
+import { medicationSchema, MedicationData } from "@/lib/schemas/medication";
 
 const frequencyOptions = [
   "Daily",
@@ -30,21 +30,6 @@ const colorPalette = [
   "#06B6D4", // Cyan
   "#F97316", // Orange
 ];
-
-const medicationSchema = z.object({
-  name: z.string().min(1, "Medication name is required"),
-  dosage: z.string().min(1, "Dosage is required"),
-  frequency: z.string().min(1, "Frequency is required"),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  color: z.string().optional(),
-  notes: z.string().optional(),
-  times: z.array(z.object({
-    value: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time"),
-  })).min(1, "At least one reminder time is required"),
-});
-
-type MedicationData = z.infer<typeof medicationSchema>;
 
 interface MedicationFormProps {
   initialData?: Medication;
@@ -123,7 +108,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
     <form onSubmit={handleSubmit(onSubmit)} className="animate-fade-in">
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Name */}
           <Input
             label="Medication Name"
             id="medication-name"
@@ -132,7 +116,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             error={errors.name?.message}
           />
 
-          {/* Dosage */}
           <Input
             label="Dosage"
             id="medication-dosage"
@@ -141,7 +124,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             error={errors.dosage?.message}
           />
 
-          {/* Frequency */}
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="medication-frequency"
@@ -175,7 +157,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             {errors.frequency && <span className="text-xs text-danger">{errors.frequency.message}</span>}
           </div>
 
-          {/* Start Date */}
           <Input
             label="Start Date (optional)"
             id="medication-start-date"
@@ -183,7 +164,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             {...register("startDate")}
           />
 
-          {/* End Date */}
           <Input
             label="End Date (optional)"
             id="medication-end-date"
@@ -192,7 +172,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           />
         </div>
 
-        {/* Color Picker */}
         <div className="mt-6 flex flex-col gap-2">
           <label className="text-sm font-medium text-text-secondary">
             Color Indicator (Optional)
@@ -216,7 +195,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           <p className="text-xs text-text-muted mt-1">If no color is chosen, a random one will be assigned.</p>
         </div>
 
-        {/* Notes */}
         <div className="mt-6 flex flex-col gap-1.5">
           <label
             htmlFor="medication-notes"
@@ -241,7 +219,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           />
         </div>
 
-        {/* Reminder Times */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-4">
             <Text variant="h3">Reminder Times</Text>
@@ -328,7 +305,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center justify-end gap-3 mt-6">
         <Button
           type="button"

@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/atoms/Input";
@@ -14,12 +13,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { UserProfile } from "@/components/providers/AuthProvider";
 
-const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-type LoginData = z.infer<typeof loginSchema>;
+import { loginSchema, LoginData } from "@/lib/schemas/auth";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -67,7 +61,6 @@ export default function AuthPage() {
 
   return (
     <div className="animate-fade-in">
-      {/* Brand */}
       <div className="flex flex-col items-center mb-8">
         <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-4 shadow-[0_0_40px_rgba(91,108,255,0.2)]">
           <span className="text-white text-xl font-bold">M</span>
@@ -80,7 +73,6 @@ export default function AuthPage() {
         </Text>
       </div>
 
-      {/* Login card */}
       <div className="bg-card border border-border rounded-xl p-6">
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -133,7 +125,6 @@ export default function AuthPage() {
         </form>
       </div>
 
-      {/* Sign up link */}
       <p className="text-center mt-6 text-sm text-text-muted">
         Don&apos;t have an account?{" "}
         <Link

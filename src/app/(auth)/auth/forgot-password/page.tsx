@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/atoms/Input";
@@ -11,25 +10,12 @@ import OTPInput from "@/components/atoms/OTPInput";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
 import { sendWhatsAppOTP, resetPasswordAction } from "@/app/actions/auth";
-
-const step1Schema = z.object({
-  phone: z.string()
-    .transform((val) => val.replace(/[^\d]/g, ""))
-    .refine((val) => /^7\d{8}$/.test(val), {
-      message: "Enter a valid Sri Lankan mobile number (e.g. 7X XXX XXXX)",
-    }),
-});
-type Step1Data = z.infer<typeof step1Schema>;
-
-const step2Schema = z.object({
-  otpCode: z.string()
-    .transform((val) => val.replace(/[^\d]/g, ""))
-    .refine((val) => val.length === 6, {
-      message: "Code must be exactly 6 digits",
-    }),
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-});
-type Step2Data = z.infer<typeof step2Schema>;
+import {
+  forgotPasswordStep1Schema,
+  forgotPasswordStep2Schema,
+  ForgotPasswordStep1Data,
+  ForgotPasswordStep2Data,
+} from "@/lib/schemas/auth";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -38,14 +24,14 @@ export default function ForgotPasswordPage() {
   const [globalError, setGlobalError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
+  const [step1Data, setStep1Data] = useState<ForgotPasswordStep1Data | null>(null);
 
   const {
     register: registerStep1,
     handleSubmit: handleSubmitStep1,
     formState: { errors: errors1 },
-  } = useForm<Step1Data>({
-    resolver: zodResolver(step1Schema),
+  } = useForm<ForgotPasswordStep1Data>({
+    resolver: zodResolver(forgotPasswordStep1Schema),
   });
 
   const {
@@ -53,11 +39,11 @@ export default function ForgotPasswordPage() {
     handleSubmit: handleSubmitStep2,
     control: controlStep2,
     formState: { errors: errors2 },
-  } = useForm<Step2Data>({
-    resolver: zodResolver(step2Schema),
+  } = useForm<ForgotPasswordStep2Data>({
+    resolver: zodResolver(forgotPasswordStep2Schema),
   });
 
-  const onStep1Submit = async (data: Step1Data) => {
+  const onStep1Submit = async (data: ForgotPasswordStep1Data) => {
     setLoading(true);
     setGlobalError("");
     try {
@@ -80,7 +66,7 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const onStep2Submit = async (data: Step2Data) => {
+  const onStep2Submit = async (data: ForgotPasswordStep2Data) => {
     if (!step1Data) return;
     setLoading(true);
     setGlobalError("");

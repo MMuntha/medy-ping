@@ -25,12 +25,10 @@ export default function OTPInput({
     if (/[^0-9]/.test(val)) return;
 
     const newValue = value.split("");
-    // If user typed a single digit
     if (val.length <= 1) {
       newValue[index] = val;
       onChange(newValue.join("").slice(0, length));
 
-      // Move focus to next input if not empty
       if (val !== "" && index < length - 1) {
         inputRefs.current[index + 1]?.focus();
       }
@@ -41,13 +39,11 @@ export default function OTPInput({
     if (e.key === "Backspace") {
       const newValue = value.split("");
 
-      // If current input is empty, delete previous and move focus
       if (!value[index] && index > 0) {
         newValue[index - 1] = "";
         onChange(newValue.join(""));
         inputRefs.current[index - 1]?.focus();
       } else {
-        // Just clear current
         newValue[index] = "";
         onChange(newValue.join(""));
       }
