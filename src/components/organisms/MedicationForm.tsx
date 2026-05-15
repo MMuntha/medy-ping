@@ -11,6 +11,8 @@ import Button from "@/components/atoms/Button";
 import TimeInput from "@/components/atoms/TimeInput";
 import Text from "@/components/atoms/Text";
 import { medicationSchema, MedicationData } from "@/lib/schemas/medication";
+import { useAuth } from "@/components/providers/AuthProvider";
+import MedicationNamePrompt from "@/components/organisms/MedicationNamePrompt";
 
 const frequencyOptions = [
   "Daily",
@@ -37,9 +39,11 @@ interface MedicationFormProps {
 
 export default function MedicationForm({ initialData }: MedicationFormProps) {
   const router = useRouter();
-  const { addMedication, updateMedication } = useMedications();
+  const { medications, addMedication, updateMedication } = useMedications();
+  const { profile, user } = useAuth();
   const isEditing = !!initialData;
   const [isSaving, setIsSaving] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
 
   const {
     register,
@@ -93,10 +97,22 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
 
       if (isEditing && initialData) {
         await updateMedication(initialData.id, medicationPayload);
+        router.push("/medications");
       } else {
         await addMedication(medicationPayload);
+        
+        // Show prompt if it's their very first medication, they have no name set, and haven't skipped
+        if (
+          medications.length === 0 && 
+          profile && 
+          !profile.preferredName && 
+          !profile.hasSkippedMedPrompt
+        ) {
+          setShowPrompt(true);
+        } else {
+          router.push("/medications");
+        }
       }
-      router.push("/medications");
     } catch (error) {
       console.error("Error saving medication:", error);
     } finally {
@@ -105,8 +121,17 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="animate-fade-in">
-      <div className="bg-card border border-border rounded-xl p-6">
+    <>
+      {showPrompt && user && (
+        <MedicationNamePrompt 
+          uid={user.uid} 
+          onComplete={() => {
+            router.push("/medications");
+          }} 
+        />
+      )}
+      <form onSubmit={handleSubmit(onSubmit)} className="animate-fade-in">
+        <div className="bg-card border border-border rounded-xl p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
             label="Medication Name"
@@ -318,6 +343,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           {isEditing ? "Save Changes" : "Add Medication"}
         </Button>
       </div>
-    </form>
+      </form>
+    </>
   );
 }

@@ -110,6 +110,8 @@ export async function finalizeSignupAction(email: string, password: string | und
         phoneNumber: formattedPhone,
         whatsappVerified: true,
         consentGiven: true,
+        hasSkippedWelcomePrompt: false,
+        hasSkippedMedPrompt: false,
         createdAt: new Date(),
       });
     } catch (dbError: any) {

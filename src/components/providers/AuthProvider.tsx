@@ -11,6 +11,9 @@ export interface UserProfile {
   phoneNumber: string;
   whatsappVerified: boolean;
   consentGiven?: boolean;
+  preferredName?: string;
+  hasSkippedWelcomePrompt?: boolean;
+  hasSkippedMedPrompt?: boolean;
 }
 
 interface AuthContextType {

@@ -9,25 +9,19 @@ export const loginSchema = z.object({
 export type LoginData = z.infer<typeof loginSchema>;
 
 // --- Signup ---
-export const signupStep1Schema = z
-  .object({
-    email: z.string().email("Invalid email address"),
-    phone: z
-      .string()
-      .transform((val) => val.replace(/[^\d]/g, ""))
-      .refine((val) => /^7\d{8}$/.test(val), {
-        message: "Enter a valid Sri Lankan mobile number (e.g. 7X XXX XXXX)",
-      }),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-    consentGiven: z.boolean().refine((val) => val === true, {
-      message: "You must agree to receive reminders on WhatsApp",
+export const signupStep1Schema = z.object({
+  email: z.string().email("Invalid email address"),
+  phone: z
+    .string()
+    .transform((val) => val.replace(/[^\d]/g, ""))
+    .refine((val) => /^7\d{8}$/.test(val), {
+      message: "Enter a valid Sri Lankan mobile number (e.g. 7X XXX XXXX)",
     }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  consentGiven: z.boolean().refine((val) => val === true, {
+    message: "You must agree to receive reminders on WhatsApp",
+  }),
+});
 
 export type SignupStep1Data = z.infer<typeof signupStep1Schema>;
 

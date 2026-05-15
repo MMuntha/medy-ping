@@ -84,12 +84,16 @@ async function handler(req: Request) {
 
         if (TWILIO_SINGLE_REMINDER_SID) {
           messagePayload.contentSid = TWILIO_SINGLE_REMINDER_SID;
+          // We can't change the Twilio template structure from here without knowing its variables,
+          // but we can pass preferredName as a variable in case the template is updated.
           messagePayload.contentVariables = JSON.stringify({
             "1": med.name,
             "2": med.dosage,
+            "3": userData.preferredName || "there",
           });
         } else {
-          messagePayload.body = `Hey! It's time for your medication:\n*${med.name} (${med.dosage})*\n\nPlease reply:\n✅ *Taken*\n⏰ *SNOOZE* to be reminded in 30 minutes.`;
+          const greeting = userData.preferredName ? `Hey ${userData.preferredName}` : "Hey";
+          messagePayload.body = `${greeting}! It's time for your medication:\n*${med.name} (${med.dosage})*\n\nPlease reply:\n✅ *Taken*\n⏰ *SNOOZE* to be reminded in 30 minutes.`;
         }
 
         await twilioClient.messages.create(messagePayload);
@@ -123,9 +127,11 @@ async function handler(req: Request) {
           messagePayload.contentSid = TWILIO_BATCH_REMINDER_SID;
           messagePayload.contentVariables = JSON.stringify({
             "1": medNames,
+            "2": userData.preferredName || "there",
           });
         } else {
-          messagePayload.body = `Hey! It's time for your medications:\n*${medNames}*\n\nPlease reply:\n✅ *Took All*\n⏰ *Snooze All* to be reminded in 30 minutes.`;
+          const greeting = userData.preferredName ? `Hey ${userData.preferredName}` : "Hey";
+          messagePayload.body = `${greeting}! It's time for your medications:\n*${medNames}*\n\nPlease reply:\n✅ *Took All*\n⏰ *Snooze All* to be reminded in 30 minutes.`;
         }
 
         await twilioClient.messages.create(messagePayload);
@@ -154,10 +160,15 @@ async function handler(req: Request) {
       const delayedData = delayedDoc.data();
       const formattedPhone = `whatsapp:${delayedData.phoneNumber}`;
 
+      // Fetch user data to get preferredName for delayed reminder
+      const userDoc = await adminDb.collection("users").doc(delayedData.userId).get();
+      const userData = userDoc.exists ? userDoc.data() : null;
+      const greeting = userData?.preferredName ? `Hey ${userData.preferredName}` : "Hey";
+
       await twilioClient.messages.create({
         from: TWILIO_WHATSAPP_NUMBER,
         to: formattedPhone,
-        body: `Hey! This is your follow-up reminder to take:\n*${delayedData.medicationName}*\n\nPlease reply *YES* once you've taken it.`,
+        body: `${greeting}! This is your follow-up reminder to take:\n*${delayedData.medicationName}*\n\nPlease reply *YES* once you've taken it.`,
       });
 
       // Delete the delayed reminder once sent

@@ -187,14 +187,6 @@ export default function SignupPage() {
               error={errors1.password?.message}
             />
 
-            <Input
-              label="Confirm Password"
-              id="signup-confirm-password"
-              type="password"
-              placeholder="••••••••"
-              {...registerStep1("confirmPassword")}
-              error={errors1.confirmPassword?.message}
-            />
 
             <div className="pt-2">
               <Controller
