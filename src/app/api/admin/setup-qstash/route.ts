@@ -6,14 +6,16 @@ export async function GET(req: Request) {
   // For this MVP setup phase, it's fine to leave it open so you can hit it easily.
   
   const token = process.env.QSTASH_TOKEN;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  // Fallback to VERCEL_URL for preview environments
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                 (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
 
   if (!token) {
     return NextResponse.json({ error: "QSTASH_TOKEN is not set in environment variables." }, { status: 500 });
   }
 
   if (!baseUrl) {
-    return NextResponse.json({ error: "NEXT_PUBLIC_BASE_URL is not set in environment variables." }, { status: 500 });
+    return NextResponse.json({ error: "NEXT_PUBLIC_BASE_URL or VERCEL_URL is not set in environment variables." }, { status: 500 });
   }
 
   try {

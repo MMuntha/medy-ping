@@ -10,10 +10,13 @@ import Text from "@/components/atoms/Text";
 import { useMedications } from "@/hooks/useMedications";
 import { useTodayLogs } from "@/hooks/useTodayLogs";
 import { Reminder } from "@/lib/types";
+import { useAuth } from "@/components/providers/AuthProvider";
+import WelcomeNameModal from "@/components/organisms/WelcomeNameModal";
 
 export default function DashboardContent() {
   const { medications, loading, error } = useMedications();
   const { logs, loading: logsLoading } = useTodayLogs();
+  const { profile, user } = useAuth();
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -66,8 +69,21 @@ export default function DashboardContent() {
     );
   }
 
+  const showWelcomeModal = 
+    profile && 
+    !profile.preferredName && 
+    !profile.hasSkippedWelcomePrompt;
+
   return (
     <div className="animate-fade-in">
+      {showWelcomeModal && user && (
+        <WelcomeNameModal 
+          uid={user.uid} 
+          onComplete={() => {
+            // Force a slight state refresh or rely on Firestore listener
+          }} 
+        />
+      )}
       <TopBar title="Dashboard" subtitle={today} />
 
       {/* Stats */}

@@ -3,212 +3,279 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
+import Checkbox from "@/components/atoms/Checkbox";
+import OTPInput from "@/components/atoms/OTPInput";
 import StepIndicator from "@/components/molecules/StepIndicator";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
-import { sendWhatsAppOTP } from "@/app/actions/auth";
-
-function validateSLPhone(phone: string): boolean {
-  const digits = phone.replace(/\s/g, "");
-  return /^7\d{8}$/.test(digits);
-}
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { sendWhatsAppOTP, finalizeSignupAction } from "@/app/actions/auth";
+import {
+  signupStep1Schema,
+  signupStep2Schema,
+  SignupStep1Data,
+  SignupStep2Data,
+} from "@/lib/schemas/auth";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
-  const [phoneError, setPhoneError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+  const [globalError, setGlobalError] = useState("");
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow only digits and spaces, max 9 digits
-    const raw = e.target.value.replace(/[^\d\s]/g, "");
-    const digitsOnly = raw.replace(/\s/g, "");
-    if (digitsOnly.length <= 9) {
-      setPhone(raw);
-      if (phoneError) setPhoneError("");
-    }
-  };
+  const [step1Data, setStep1Data] = useState<SignupStep1Data | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register: registerStep1,
+    handleSubmit: handleSubmitStep1,
+    control: controlStep1,
+    formState: { errors: errors1 },
+  } = useForm<SignupStep1Data>({
+    resolver: zodResolver(signupStep1Schema),
+    defaultValues: {
+      consentGiven: true,
+    },
+  });
 
-    // Validate phone
-    if (!validateSLPhone(phone)) {
-      setPhoneError("Enter a valid Sri Lankan mobile number");
-      return;
-    }
+  const {
+    register: registerStep2,
+    handleSubmit: handleSubmitStep2,
+    control: controlStep2,
+    formState: { errors: errors2 },
+  } = useForm<SignupStep2Data>({
+    resolver: zodResolver(signupStep2Schema),
+  });
 
-    // Validate passwords match
-    if (password !== confirmPassword) {
-      setPasswordError("Passwords do not match");
-      return;
-    }
-
-    if (password.length < 8) {
-      setPasswordError("Password must be at least 8 characters");
-      return;
-    }
-
+  const onStep1Submit = async (data: SignupStep1Data) => {
     setLoading(true);
+    setGlobalError("");
     try {
-      const fullPhone = `+94${phone}`;
-      
-      // 1. Create User
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // 2. Save profile in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        email: email,
-        phoneNumber: fullPhone,
-        whatsappVerified: false,
-        createdAt: serverTimestamp(),
-      });
-
-      // 3. Send WhatsApp OTP
+      const fullPhone = `+94${data.phone}`;
       const res = await sendWhatsAppOTP(fullPhone);
+
       if (!res.success) {
-        setPhoneError(res.error || "Failed to send OTP");
+        setGlobalError(res.error || "Failed to send verification code");
         setLoading(false);
         return;
       }
 
-      // 4. Redirect to verify page with phone number
-      router.push(`/auth/verify?phone=${encodeURIComponent(fullPhone)}`);
+      setStep1Data(data);
+      setStep(2);
+      setLoading(false);
     } catch (error: any) {
-      console.error("Signup error:", error);
-      setPasswordError(error.message || "Failed to sign up");
+      console.error("OTP error:", error);
+      setGlobalError("An unexpected error occurred");
+      setLoading(false);
+    }
+  };
+
+  const onStep2Submit = async (data: SignupStep2Data) => {
+    if (!step1Data) return;
+    setLoading(true);
+    setGlobalError("");
+
+    try {
+      const fullPhone = `+94${step1Data.phone}`;
+      const res = await finalizeSignupAction(
+        step1Data.email,
+        step1Data.password,
+        fullPhone,
+        data.otpCode
+      );
+
+      if (!res.success) {
+        setGlobalError(res.error || "Verification failed");
+        setLoading(false);
+        return;
+      }
+
+      await signInWithEmailAndPassword(
+        auth,
+        step1Data.email,
+        step1Data.password
+      );
+
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error("Finalize error:", error);
+      setGlobalError(error.message || "Failed to complete signup");
       setLoading(false);
     }
   };
 
   return (
     <div className="animate-fade-in">
-      <StepIndicator currentStep={1} />
+      <StepIndicator currentStep={step} />
 
-      {/* Brand */}
       <div className="flex flex-col items-center mb-8">
         <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-4 shadow-[0_0_40px_rgba(91,108,255,0.2)]">
           <span className="text-white text-xl font-bold">M</span>
         </div>
         <Text variant="h1" className="text-center">
-          Create your account
+          {step === 1 ? "Create your account" : "Verify WhatsApp"}
         </Text>
         <Text variant="body" className="text-center mt-2">
-          Start managing your medication reminders
+          {step === 1
+            ? "Start managing your medication reminders"
+            : `We sent a code to +94 ${step1Data?.phone}`}
         </Text>
       </div>
 
-      {/* Signup card */}
       <div className="bg-card border border-border rounded-xl p-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <Input
-            label="Email"
-            id="signup-email"
-            type="email"
-            placeholder="john@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-
-          {/* Phone number with +94 prefix */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="signup-phone"
-              className="text-sm font-medium text-text-secondary"
-            >
-              Phone Number
-            </label>
-            <div className="flex">
-              <div className="flex items-center justify-center px-3.5 py-2.5 bg-surface border border-border border-r-0 rounded-l-lg">
-                <span className="text-sm font-medium text-text-secondary whitespace-nowrap">
-                  +94
-                </span>
-              </div>
-              <input
-                id="signup-phone"
-                type="tel"
-                placeholder="7X XXX XXXX"
-                value={phone}
-                onChange={handlePhoneChange}
-                required
-                className={`
-                  flex-1 px-3 py-2.5 rounded-r-lg rounded-l-none
-                  bg-bg border border-border
-                  text-sm text-text-primary
-                  placeholder:text-text-muted
-                  transition-all duration-150
-                  focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
-                  ${phoneError ? "border-danger focus:border-danger focus:ring-danger" : ""}
-                `}
-              />
-            </div>
-            {phoneError && (
-              <span className="text-xs text-danger">{phoneError}</span>
-            )}
+        {globalError && (
+          <div className="mb-4 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
+            {globalError}
           </div>
+        )}
 
-          <Input
-            label="Password"
-            id="signup-password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              if (passwordError) setPasswordError("");
-            }}
-            required
-          />
-
-          <div>
+        {step === 1 ? (
+          <form
+            onSubmit={handleSubmitStep1(onStep1Submit)}
+            className="flex flex-col gap-5"
+          >
             <Input
-              label="Confirm Password"
-              id="signup-confirm-password"
+              label="Email"
+              id="signup-email"
+              type="email"
+              placeholder="john@example.com"
+              {...registerStep1("email")}
+              error={errors1.email?.message}
+            />
+
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="signup-phone"
+                className="text-sm font-medium text-text-secondary"
+              >
+                Phone Number
+              </label>
+              <div className="flex">
+                <div className="flex items-center justify-center px-3.5 py-2.5 bg-surface border border-border border-r-0 rounded-l-lg">
+                  <span className="text-sm font-medium text-text-secondary whitespace-nowrap">
+                    +94
+                  </span>
+                </div>
+                <input
+                  id="signup-phone"
+                  type="tel"
+                  placeholder="7X XXX XXXX"
+                  {...registerStep1("phone")}
+                  className={`flex-1 px-3 py-2.5 rounded-r-lg rounded-l-none bg-bg border border-border text-sm text-text-primary placeholder:text-text-muted transition-all duration-150 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent ${
+                    errors1.phone
+                      ? "border-danger focus:border-danger focus:ring-danger"
+                      : ""
+                  }`}
+                />
+              </div>
+              {errors1.phone && (
+                <span className="text-xs text-danger">
+                  {errors1.phone.message}
+                </span>
+              )}
+            </div>
+
+            <Input
+              label="Password"
+              id="signup-password"
               type="password"
               placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                if (passwordError) setPasswordError("");
-              }}
-              error={passwordError}
-              required
+              {...registerStep1("password")}
+              error={errors1.password?.message}
             />
-          </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={loading}
-            className="w-full mt-1"
+
+            <div className="pt-2">
+              <Controller
+                name="consentGiven"
+                control={controlStep1}
+                render={({ field }) => (
+                  <Checkbox
+                    id="signup-consent"
+                    label="I agree to receive reminders on WhatsApp"
+                    checked={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              {errors1.consentGiven && (
+                <p className="text-xs text-danger mt-1.5">
+                  {errors1.consentGiven.message}
+                </p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              loading={loading}
+              className="w-full mt-2"
+            >
+              Send Verification Code
+            </Button>
+          </form>
+        ) : (
+          <form
+            onSubmit={handleSubmitStep2(onStep2Submit)}
+            className="flex flex-col gap-5"
           >
-            Create Account
-          </Button>
-        </form>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">
+                6-Digit Code
+              </label>
+              <Controller
+                name="otpCode"
+                control={controlStep2}
+                defaultValue=""
+                render={({ field }) => (
+                  <OTPInput
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors2.otpCode?.message}
+                  />
+                )}
+              />
+            </div>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              loading={loading}
+              className="w-full mt-1"
+            >
+              Verify & Create Account
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setStep(1);
+                setGlobalError("");
+              }}
+              className="text-sm text-text-muted hover:text-text-primary mt-2"
+              disabled={loading}
+            >
+              {/* Change Phone Number */}
+              Back to Previous Step
+            </button>
+          </form>
+        )}
       </div>
 
-      {/* Sign in link */}
-      <p className="text-center mt-6 text-sm text-text-muted">
-        Already have an account?{" "}
-        <Link
-          href="/auth"
-          className="text-accent hover:text-accent-hover transition-colors font-medium"
-        >
-          Sign in
-        </Link>
-      </p>
+      {step === 1 && (
+        <p className="text-center mt-6 text-sm text-text-muted">
+          Already have an account?{" "}
+          <Link
+            href="/auth"
+            className="text-accent hover:text-accent-hover transition-colors font-medium"
+          >
+            Sign in
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

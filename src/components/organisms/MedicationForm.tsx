@@ -2,16 +2,17 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Medication } from "@/lib/types";
 import { useMedications } from "@/hooks/useMedications";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import TimeInput from "@/components/atoms/TimeInput";
 import Text from "@/components/atoms/Text";
-
-interface MedicationFormProps {
-  initialData?: Medication;
-}
+import { medicationSchema, MedicationData } from "@/lib/schemas/medication";
+import { useAuth } from "@/components/providers/AuthProvider";
+import MedicationNamePrompt from "@/components/organisms/MedicationNamePrompt";
 
 const frequencyOptions = [
   "Daily",
@@ -32,68 +33,86 @@ const colorPalette = [
   "#F97316", // Orange
 ];
 
+interface MedicationFormProps {
+  initialData?: Medication;
+}
+
 export default function MedicationForm({ initialData }: MedicationFormProps) {
   const router = useRouter();
-  const { addMedication, updateMedication } = useMedications();
+  const { medications, addMedication, updateMedication } = useMedications();
+  const { profile, user } = useAuth();
   const isEditing = !!initialData;
-
-  const [name, setName] = useState(initialData?.name ?? "");
-  const [dosage, setDosage] = useState(initialData?.dosage ?? "");
-  const [frequency, setFrequency] = useState(
-    initialData?.frequency ?? "Daily"
-  );
-  const [times, setTimes] = useState<string[]>(
-    initialData?.times ?? ["08:00"]
-  );
-  const [notes, setNotes] = useState(initialData?.notes ?? "");
-  const [startDate, setStartDate] = useState(initialData?.startDate ?? "");
-  const [endDate, setEndDate] = useState(initialData?.endDate ?? "");
-  const [color, setColor] = useState(initialData?.color ?? "");
   const [isSaving, setIsSaving] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
 
-  const addTime = () => {
-    setTimes([...times, "12:00"]);
-  };
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<MedicationData>({
+    resolver: zodResolver(medicationSchema),
+    defaultValues: {
+      name: initialData?.name || "",
+      dosage: initialData?.dosage || "",
+      frequency: initialData?.frequency || "Daily",
+      startDate: initialData?.startDate || "",
+      endDate: initialData?.endDate || "",
+      color: initialData?.color || "",
+      notes: initialData?.notes || "",
+      times: initialData?.times ? initialData.times.map((t) => ({ value: t })) : [{ value: "08:00" }],
+    },
+  });
 
-  const removeTime = (index: number) => {
-    if (times.length > 1) {
-      setTimes(times.filter((_, i) => i !== index));
-    }
-  };
+  const { fields, append, remove } = useFieldArray({
+    name: "times",
+    control,
+  });
 
-  const updateTime = (index: number, value: string) => {
-    const updated = [...times];
-    updated[index] = value;
-    setTimes(updated);
-  };
+  const selectedColor = watch("color");
 
   const getRandomColor = () => {
     return colorPalette[Math.floor(Math.random() * colorPalette.length)];
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: MedicationData) => {
     setIsSaving(true);
     
     try {
-      const finalColor = color || getRandomColor();
-      const medicationData = {
-        name,
-        dosage,
-        frequency,
-        times,
-        notes,
-        startDate,
-        endDate,
+      const finalColor = data.color || getRandomColor();
+      const stringTimes = data.times.map((t) => t.value);
+      
+      const medicationPayload = {
+        name: data.name,
+        dosage: data.dosage,
+        frequency: data.frequency,
+        times: stringTimes,
+        notes: data.notes || "",
+        startDate: data.startDate || "",
+        endDate: data.endDate || "",
         color: finalColor,
       };
 
       if (isEditing && initialData) {
-        await updateMedication(initialData.id, medicationData);
+        await updateMedication(initialData.id, medicationPayload);
+        router.push("/medications");
       } else {
-        await addMedication(medicationData);
+        await addMedication(medicationPayload);
+        
+        // Show prompt if it's their very first medication, they have no name set, and haven't skipped
+        if (
+          medications.length === 0 && 
+          profile && 
+          !profile.preferredName && 
+          !profile.hasSkippedMedPrompt
+        ) {
+          setShowPrompt(true);
+        } else {
+          router.push("/medications");
+        }
       }
-      router.push("/medications");
     } catch (error) {
       console.error("Error saving medication:", error);
     } finally {
@@ -102,30 +121,34 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="animate-fade-in">
-      <div className="bg-card border border-border rounded-xl p-6">
+    <>
+      {showPrompt && user && (
+        <MedicationNamePrompt 
+          uid={user.uid} 
+          onComplete={() => {
+            router.push("/medications");
+          }} 
+        />
+      )}
+      <form onSubmit={handleSubmit(onSubmit)} className="animate-fade-in">
+        <div className="bg-card border border-border rounded-xl p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Name */}
           <Input
             label="Medication Name"
             id="medication-name"
             placeholder="e.g. Lisinopril"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
+            {...register("name")}
+            error={errors.name?.message}
           />
 
-          {/* Dosage */}
           <Input
             label="Dosage"
             id="medication-dosage"
             placeholder="e.g. 10mg"
-            value={dosage}
-            onChange={(e) => setDosage(e.target.value)}
-            required
+            {...register("dosage")}
+            error={errors.dosage?.message}
           />
 
-          {/* Frequency */}
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="medication-frequency"
@@ -135,8 +158,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
             </label>
             <select
               id="medication-frequency"
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
+              {...register("frequency")}
               className="
                 w-full px-3 py-2.5 rounded-lg
                 bg-bg border border-border
@@ -157,28 +179,24 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
                 </option>
               ))}
             </select>
+            {errors.frequency && <span className="text-xs text-danger">{errors.frequency.message}</span>}
           </div>
 
-          {/* Start Date */}
           <Input
             label="Start Date (optional)"
             id="medication-start-date"
             type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            {...register("startDate")}
           />
 
-          {/* End Date */}
           <Input
             label="End Date (optional)"
             id="medication-end-date"
             type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            {...register("endDate")}
           />
         </div>
 
-        {/* Color Picker */}
         <div className="mt-6 flex flex-col gap-2">
           <label className="text-sm font-medium text-text-secondary">
             Color Indicator (Optional)
@@ -188,9 +206,9 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
               <button
                 key={c}
                 type="button"
-                onClick={() => setColor(c)}
+                onClick={() => setValue("color", c)}
                 className={`w-8 h-8 rounded-full transition-all duration-200 border-2 ${
-                  color === c 
+                  selectedColor === c 
                     ? "border-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.3)]" 
                     : "border-transparent hover:scale-110"
                 }`}
@@ -202,7 +220,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           <p className="text-xs text-text-muted mt-1">If no color is chosen, a random one will be assigned.</p>
         </div>
 
-        {/* Notes */}
         <div className="mt-6 flex flex-col gap-1.5">
           <label
             htmlFor="medication-notes"
@@ -213,8 +230,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           <textarea
             id="medication-notes"
             placeholder="Any special instructions or notes..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            {...register("notes")}
             rows={3}
             className="
               w-full px-3 py-2.5 rounded-lg
@@ -228,7 +244,6 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           />
         </div>
 
-        {/* Reminder Times */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-4">
             <Text variant="h3">Reminder Times</Text>
@@ -236,7 +251,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={addTime}
+              onClick={() => append({ value: "12:00" })}
               icon={
                 <svg
                   width="14"
@@ -258,20 +273,31 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           </div>
 
           <div className="flex flex-col gap-3">
-            {times.map((time, index) => (
-              <div key={index} className="flex items-end gap-3">
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex items-end gap-3">
                 <div className="flex-1">
-                  <TimeInput
-                    value={time}
-                    onChange={(val) => updateTime(index, val)}
-                    id={`reminder-time-${index}`}
-                    label={`Time ${index + 1}`}
+                  <Controller
+                    control={control}
+                    name={`times.${index}.value`}
+                    render={({ field: { onChange, value } }) => (
+                      <TimeInput
+                        value={value}
+                        onChange={onChange}
+                        id={`reminder-time-${index}`}
+                        label={`Time ${index + 1}`}
+                      />
+                    )}
                   />
+                  {errors.times?.[index]?.value && (
+                    <span className="text-xs text-danger block mt-1">
+                      {errors.times[index]?.value?.message}
+                    </span>
+                  )}
                 </div>
-                {times.length > 1 && (
+                {fields.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeTime(index)}
+                    onClick={() => remove(index)}
                     className="
                       h-[42px] w-[42px] flex items-center justify-center
                       rounded-lg border border-border
@@ -297,11 +323,13 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
                 )}
               </div>
             ))}
+            {errors.times?.root && (
+              <span className="text-xs text-danger">{errors.times.root.message}</span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center justify-end gap-3 mt-6">
         <Button
           type="button"
@@ -315,6 +343,7 @@ export default function MedicationForm({ initialData }: MedicationFormProps) {
           {isEditing ? "Save Changes" : "Add Medication"}
         </Button>
       </div>
-    </form>
+      </form>
+    </>
   );
 }

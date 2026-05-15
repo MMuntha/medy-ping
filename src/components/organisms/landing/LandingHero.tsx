@@ -7,9 +7,11 @@ import { motion, useScroll, useTransform } from "framer-motion";
 
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function LandingHero() {
   const imageRef = useRef(null);
+  const { user, loading } = useAuth();
 
   const { scrollYProgress } = useScroll({
     target: imageRef,
@@ -46,14 +48,27 @@ export default function LandingHero() {
 
         {/* CTA */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/auth/signup">
-            <Button
-              variant="primary"
-              className="text-lg px-8 py-4 w-full sm:w-auto hover:scale-105 transition-transform duration-300 shadow-lg shadow-accent/20"
-            >
-              Get Started
-            </Button>
-          </Link>
+          {!loading && (
+            user ? (
+              <Link href="/dashboard">
+                <Button
+                  variant="primary"
+                  className="text-lg px-8 py-4 w-full sm:w-auto hover:scale-105 transition-transform duration-300 shadow-lg shadow-accent/20"
+                >
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/auth/signup">
+                <Button
+                  variant="primary"
+                  className="text-lg px-8 py-4 w-full sm:w-auto hover:scale-105 transition-transform duration-300 shadow-lg shadow-accent/20"
+                >
+                  Get Started
+                </Button>
+              </Link>
+            )
+          )}
         </div>
 
         {/* HERO IMAGE SECTION */}

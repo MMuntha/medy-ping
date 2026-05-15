@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/atoms/Input";
 import Button from "@/components/atoms/Button";
 import Text from "@/components/atoms/Text";
@@ -11,34 +13,37 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { UserProfile } from "@/components/providers/AuthProvider";
 
+import { loginSchema, LoginData } from "@/lib/schemas/auth";
+
 export default function AuthPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [globalError, setGlobalError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginData>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (data: LoginData) => {
     setLoading(true);
-    setError("");
+    setGlobalError("");
 
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email,
-        password
+        data.email,
+        data.password
       );
       const user = userCredential.user;
 
       const docSnap = await getDoc(doc(db, "users", user.uid));
       if (docSnap.exists()) {
         const profile = docSnap.data() as UserProfile;
-        if (!profile.whatsappVerified) {
-          router.push(
-            `/auth/verify?phone=${encodeURIComponent(profile.phoneNumber)}`
-          );
-        } else if (!profile.consentGiven) {
+        if (!profile.consentGiven) {
           router.push("/auth/consent");
         } else {
           router.push("/dashboard");
@@ -49,14 +54,13 @@ export default function AuthPage() {
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      setError("Invalid email or password");
+      setGlobalError("Invalid email or password");
       setLoading(false);
     }
   };
 
   return (
     <div className="animate-fade-in">
-      {/* Brand */}
       <div className="flex flex-col items-center mb-8">
         <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-4 shadow-[0_0_40px_rgba(91,108,255,0.2)]">
           <span className="text-white text-xl font-bold">M</span>
@@ -69,10 +73,9 @@ export default function AuthPage() {
         </Text>
       </div>
 
-      {/* Login card */}
       <div className="bg-card border border-border rounded-xl p-6">
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5"
           autoComplete="off"
         >
@@ -81,9 +84,8 @@ export default function AuthPage() {
             id="auth-email"
             type="email"
             placeholder="john@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
+            {...register("email")}
+            error={errors.email?.message}
           />
 
           <div>
@@ -92,22 +94,23 @@ export default function AuthPage() {
               id="auth-password"
               type="password"
               placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+              {...register("password")}
+              error={errors.password?.message}
             />
             <div className="flex justify-end mt-2">
-              <button
-                type="button"
-                className="text-xs text-text-muted hover:text-accent transition-colors cursor-pointer"
+              <Link
+                href="/auth/forgot-password"
+                className="text-xs text-text-muted hover:text-accent transition-colors"
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
           </div>
 
-          {error && (
-            <div className="text-sm text-danger animate-fade-in">{error}</div>
+          {globalError && (
+            <div className="text-sm text-danger animate-fade-in p-3 bg-danger/10 border border-danger/20 rounded-lg">
+              {globalError}
+            </div>
           )}
 
           <Button
@@ -122,7 +125,6 @@ export default function AuthPage() {
         </form>
       </div>
 
-      {/* Sign up link */}
       <p className="text-center mt-6 text-sm text-text-muted">
         Don&apos;t have an account?{" "}
         <Link
